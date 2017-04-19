@@ -24,7 +24,15 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
+import android.widget.Toast;
 
+import com.github.privacystreams.commons.item.ItemOperators;
+import com.github.privacystreams.core.*;
+import com.github.privacystreams.core.Callback;
+import com.github.privacystreams.core.exceptions.PSException;
+import com.github.privacystreams.core.purposes.Purpose;
+import com.github.privacystreams.image.Image;
+import com.github.privacystreams.image.ImageOperators;
 import com.yanzhenjie.album.R;
 import com.yanzhenjie.album.util.AlbumUtils;
 import com.yanzhenjie.alertdialog.AlertDialog;
@@ -39,10 +47,6 @@ import java.io.File;
 abstract class BasicCameraFragment extends NoFragment {
 
     private static final String INSTANCE_CAMERA_FILE_PATH = "INSTANCE_CAMERA_FILE_PATH";
-
-    private static final int PERMISSION_REQUEST_CAMERA = 300;
-    private static final int REQUEST_CODE_ACTIVITY_CAMERA = 300;
-
     private String mCameraFilePath;
 
     @Override
@@ -55,64 +59,28 @@ abstract class BasicCameraFragment extends NoFragment {
      * Camera, but unknown permissions.
      */
     protected void cameraUnKnowPermission() {
-        if (Build.VERSION.SDK_INT >= 23) {
-            int permissionResult = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA);
-            if (permissionResult == PackageManager.PERMISSION_GRANTED) {
-                cameraWithPermission();
-            } else if (permissionResult == PackageManager.PERMISSION_DENIED) {
-                requestPermissions(new String[]{Manifest.permission.CAMERA}, PERMISSION_REQUEST_CAMERA);
-            }
-        } else {
-            cameraWithPermission();
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        switch (requestCode) {
-            case PERMISSION_REQUEST_CAMERA: {
-                int permissionResult = grantResults[0];
-                if (permissionResult == PackageManager.PERMISSION_GRANTED) {
-                    cameraWithPermission();
-                } else {
-                    AlertDialog.build(getContext())
-                            .setTitle(R.string.album_dialog_permission_failed)
-                            .setMessage(R.string.album_permission_camera_failed_hint)
-                            .setPositiveButton(R.string.album_dialog_sure, new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    // Nothing.
-                                }
-                            })
-                            .show();
-                }
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    }
-
-
-    /**
-     * Camera, has been given permission.
-     */
-    private void cameraWithPermission() {
-        String outFileFolder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getAbsolutePath();
-        String outFilePath = AlbumUtils.getNowDateTime("yyyyMMdd_HHmmssSSS") + ".jpg";
-        File file = new File(outFileFolder, outFilePath);
-        mCameraFilePath = file.getAbsolutePath();
-        AlbumUtils.startCamera(this, REQUEST_CODE_ACTIVITY_CAMERA, file);
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_CODE_ACTIVITY_CAMERA) {
-            if (resultCode == RESULT_OK) {
-                onCameraBack(mCameraFilePath);
-            }
-        }
+        UQI uqi = new UQI(this.getContext());
+        uqi.getData(Image.takeFromCamera(), Purpose.UTILITY("taking picture."))
+                .setField("imagePath", ImageOperators.getFilepath(Image.IMAGE_DATA))
+                .ifPresent("imagePath", new Callback<String>() {
+                    @Override
+                    protected void onInput(String imagePath) {
+                        onCameraBack(imagePath);
+                    }
+                    @Override
+                    protected void onFail(PSException exception) {
+                        AlertDialog.build(getContext())
+                                .setTitle(R.string.album_dialog_permission_failed)
+                                .setMessage(R.string.album_permission_camera_failed_hint)
+                                .setPositiveButton(R.string.album_dialog_sure, new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        // Nothing.
+                                    }
+                                })
+                                .show();
+                    }
+                });
     }
 
     /**
@@ -121,6 +89,5 @@ abstract class BasicCameraFragment extends NoFragment {
      * @param imagePath file path.
      */
     protected abstract void onCameraBack(String imagePath);
-
 
 }

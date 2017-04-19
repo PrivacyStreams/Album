@@ -11,6 +11,7 @@ android {
 }
 
 dependencies {
+    compile rootProject.ext.dependencies.privacystreams
     compile rootProject.ext.dependencies.appcompat
     compile rootProject.ext.dependencies.design
     compile rootProject.ext.dependencies.recyclerview

@@ -20,6 +20,16 @@ import android.database.Cursor;
 import android.os.AsyncTask;
 import android.provider.MediaStore;
 
+import com.github.privacystreams.core.Callback;
+import com.github.privacystreams.core.Function;
+import com.github.privacystreams.core.Item;
+import com.github.privacystreams.core.UQI;
+import com.github.privacystreams.core.exceptions.PSException;
+import com.github.privacystreams.core.purposes.Purpose;
+import com.github.privacystreams.core.transformations.group.GroupItem;
+import com.github.privacystreams.image.Image;
+import com.github.privacystreams.image.ImageOperators;
+import com.yanzhenjie.album.Album;
 import com.yanzhenjie.album.R;
 import com.yanzhenjie.album.dialog.AlbumWaitDialog;
 import com.yanzhenjie.album.entity.AlbumFolder;
@@ -109,55 +119,50 @@ public class ScanTask extends AsyncTask<List<String>, Void, List<AlbumFolder>> {
      * @return {@code List<AlbumFolder>}.
      */
     private List<AlbumFolder> getPhotoAlbum(Context context) {
-        Cursor cursor = MediaStore.Images.Media.query(
-                context.getContentResolver(),
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, STORE_IMAGES);
-        Map<String, AlbumFolder> albumFolderMap = new HashMap<>();
-
-        AlbumFolder allImageAlbumFolder = new AlbumFolder();
+        final AlbumFolder allImageAlbumFolder = new AlbumFolder();
         allImageAlbumFolder.setChecked(true);
         allImageAlbumFolder.setName(context.getString(R.string.album_all_image));
-
-        while (cursor.moveToNext()) {
-            int imageId = cursor.getInt(0);
-            String imagePath = cursor.getString(1);
-            String imageName = cursor.getString(2);
-            long addTime = cursor.getLong(3);
-
-            int bucketId = cursor.getInt(4);
-            String bucketName = cursor.getString(5);
-
-            AlbumImage albumImage = new AlbumImage();
-            albumImage.setId(imageId);
-            albumImage.setPath(imagePath);
-            albumImage.setName(imageName);
-            albumImage.setAddTime(addTime);
-
-            allImageAlbumFolder.addPhoto(albumImage);
-
-            AlbumFolder albumFolder = albumFolderMap.get(bucketName);
-            if (albumFolder != null) {
-                albumFolder.addPhoto(albumImage);
-            } else {
-                albumFolder = new AlbumFolder();
-                albumFolder.setId(bucketId);
-                albumFolder.setName(bucketName);
-                albumFolder.addPhoto(albumImage);
-
-                albumFolderMap.put(bucketName, albumFolder);
-            }
-        }
-        cursor.close();
         List<AlbumFolder> albumFolders = new ArrayList<>();
 
-        Collections.sort(allImageAlbumFolder.getImages());
-        albumFolders.add(allImageAlbumFolder);
-
-        for (Map.Entry<String, AlbumFolder> folderEntry : albumFolderMap.entrySet()) {
-            AlbumFolder albumFolder = folderEntry.getValue();
-            Collections.sort(albumFolder.getImages());
-            albumFolders.add(albumFolder);
+        UQI uqi = new UQI(context);
+        try {
+            albumFolders = uqi.getData(Image.getFromStorage(), Purpose.UTILITY("Album"))
+                    .setField("imagePath", ImageOperators.getFilepath(Image.IMAGE_DATA))
+                    .setField("albumImage", new Function<Item, AlbumImage>() {
+                        @Override
+                        public AlbumImage apply(UQI uqi, Item item) {
+                            AlbumImage albumImage = new AlbumImage();
+                            albumImage.setId((Integer) item.getValueByField(Image.IMAGE_ID));
+                            albumImage.setPath((String) item.getValueByField("imagePath"));
+                            albumImage.setName((String) item.getValueByField(Image.IMAGE_NAME));
+                            albumImage.setAddTime((Long) item.getValueByField(Image.DATE_ADDED));
+                            return albumImage;
+                        }
+                    })
+                    .groupBy(Image.BUCKET_ID)
+                    .setField("albumFolder", new Function<Item, AlbumFolder>() {
+                        @Override
+                        public AlbumFolder apply(UQI uqi, Item item) {
+                            AlbumFolder albumFolder = new AlbumFolder();
+                            albumFolder.setId((Integer) item.getValueByField(Image.BUCKET_ID));
+                            List<Item> images = item.getValueByField(GroupItem.GROUPED_ITEMS);
+                            for (Item image : images) {
+                                AlbumImage albumImage = image.getValueByField("albumImage");
+                                albumFolder.setName((String) image.getValueByField(Image.BUCKET_NAME));
+                                albumFolder.addPhoto(albumImage);
+                                allImageAlbumFolder.addPhoto(albumImage);
+                            }
+                            Collections.sort(albumFolder.getImages());
+                            return albumFolder;
+                        }
+                    })
+                    .asList("albumFolder");
+        } catch (PSException e) {
+            e.printStackTrace();
         }
+
+        Collections.sort(allImageAlbumFolder.getImages());
+        albumFolders.add(0, allImageAlbumFolder);
         return albumFolders;
     }
 }
