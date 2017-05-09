@@ -127,13 +127,12 @@ public class ScanTask extends AsyncTask<List<String>, Void, List<AlbumFolder>> {
         UQI uqi = new UQI(context);
         try {
             albumFolders = uqi.getData(Image.getFromStorage(), Purpose.UTILITY("Album"))
-                    .setField("imagePath", ImageOperators.getFilepath(Image.IMAGE_DATA))
                     .setField("albumImage", new Function<Item, AlbumImage>() {
                         @Override
                         public AlbumImage apply(UQI uqi, Item item) {
                             AlbumImage albumImage = new AlbumImage();
                             albumImage.setId((Integer) item.getValueByField(Image.IMAGE_ID));
-                            albumImage.setPath((String) item.getValueByField("imagePath"));
+                            albumImage.setPath((String) item.getValueByField(Image.IMAGE_PATH));
                             albumImage.setName((String) item.getValueByField(Image.IMAGE_NAME));
                             albumImage.setAddTime((Long) item.getValueByField(Image.DATE_ADDED));
                             return albumImage;

@@ -22,7 +22,7 @@ ext {
 
     dependencies = [
             album       : project(':album'),
-            privacystreams : 'com.github.privacystreams:privacystreams-core:0.1.0',
+            privacystreams : 'com.github.privacystreams:privacystreams-core:0.1.3',
             design      : 'com.android.support:design:25.3.0',
             appcompat   : 'com.android.support:appcompat-v7:25.3.0',
             recyclerview: 'com.android.support:recyclerview-v7:25.3.0',
